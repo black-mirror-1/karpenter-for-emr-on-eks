@@ -1,0 +1,18 @@
+autoDiscovery:
+    clusterName: {EKSCLUSTER_NAME}
+awsRegion: {AWS_REGION}
+image:
+    tag: {CAS_VERSION}
+nodeSelector:
+    app: ops
+podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: 'false'
+extraArgs:
+    skip-nodes-with-system-pods: false
+    scale-down-unneeded-time: 30s
+    scale-down-unready-time: 1m
+    expander: least-waste
+rbac:
+    serviceAccount:
+        create: false
+        name: cluster-autoscaler

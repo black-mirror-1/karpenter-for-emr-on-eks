@@ -1,0 +1,246 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: {EKSCLUSTER_NAME}
+  region: {AWS_REGION}
+  version: "{EKS_VERSION}"
+  tags:
+    karpenter.sh/discovery: {EKSCLUSTER_NAME}
+    for-use-with-amazon-emr-managed-policies: "true"
+    
+vpc:
+  clusterEndpoints:
+      publicAccess: true
+      privateAccess: true
+  cidr: "10.4.0.0/16"
+  
+availabilityZones: ["{AWS_REGION}a","{AWS_REGION}b","{AWS_REGION}c"]
+
+# IRSA setup
+iam:
+  withOIDC: true
+  serviceAccounts:
+  - metadata:
+      name: cluster-autoscaler
+      namespace: kube-system
+      labels: {aws-usage: "application"}
+    wellKnownPolicies:
+      autoScaler: true
+    # roleName: eksctl-cluster-autoscaler-role
+  - metadata:
+      name: amp-iamproxy-ingest-service-account
+      namespace: prometheus
+      labels: {aws-usage: "monitoring"}
+    attachPolicyARNs: 
+    - "arn:aws:iam::aws:policy/AmazonPrometheusRemoteWriteAccess"
+    roleName: {EKSCLUSTER_NAME}-prometheus-ingest 
+    roleOnly: true
+    
+managedNodeGroups:
+  - name: ops
+    instanceTypes: ["c5.xlarge"]
+    availabilityZones: ["{AWS_REGION}c"] 
+    volumeSize: 100
+    desiredCapacity: 1
+    maxSize: 2
+    labels:
+      app: ops
+ 
+nodeGroups:
+  - name: od-8vcpu-16gb
+    minSize: 0
+    desiredCapacity: 1
+    maxSize: 50
+    instancesDistribution:
+      instanceTypes: ["c5.2xlarge","c5a.2xlarge","c5ad.2xlarge","c5d.2xlarge","c6a.2xlarge"]
+      onDemandBaseCapacity: 0
+      onDemandPercentageAboveBaseCapacity: 100
+    iam:
+      withAddonPolicies:
+        cloudWatch: true
+    availabilityZones: ["{AWS_REGION}b"] 
+    preBootstrapCommands:
+      - "IDX=1;for DEV in /dev/nvme[1-9]n1;do sudo mkfs.xfs ${DEV}; sudo mkdir -p /local${IDX}; sudo echo ${DEV} /local${IDX} xfs defaults,noatime 1 2 >> /etc/fstab; IDX=$((${IDX} + 1)); done"
+      - "sudo mount -a"
+      - "sudo chown ec2-user:ec2-user /local*"
+    volumeSize: 20
+    volumeType: gp3
+    additionalVolumes:
+      - volumeName: '/dev/xvdf'
+        volumeSize: 200
+        volumeType: io1
+        volumeIOPS: 6400
+    disableIMDSv1: true
+    labels:
+      app: caspark
+      eks.amazonaws.com/capacityType: ON_DEMAND
+    tags:
+      # required for cluster-autoscaler auto-discovery
+      k8s.io/cluster-autoscaler/enabled: "true"
+      k8s.io/cluster-autoscaler/{EKSCLUSTER_NAME}: "owned"
+  - name: od-16vcpu-32gb
+    minSize: 0
+    desiredCapacity: 1
+    maxSize: 50
+    instancesDistribution:
+      instanceTypes: ["c5.4xlarge","c5a.4xlarge","c5ad.4xlarge","c5d.4xlarge","c6a.4xlarge"]
+      onDemandBaseCapacity: 0
+      onDemandPercentageAboveBaseCapacity: 100
+    iam:
+      withAddonPolicies:
+        cloudWatch: true
+    availabilityZones: ["{AWS_REGION}b"] 
+    preBootstrapCommands:
+      - "IDX=1;for DEV in /dev/nvme[1-9]n1;do sudo mkfs.xfs ${DEV}; sudo mkdir -p /local${IDX}; sudo echo ${DEV} /local${IDX} xfs defaults,noatime 1 2 >> /etc/fstab; IDX=$((${IDX} + 1)); done"
+      - "sudo mount -a"
+      - "sudo chown ec2-user:ec2-user /local*"
+    volumeSize: 20
+    volumeType: gp3
+    additionalVolumes:
+      - volumeName: '/dev/xvdf'
+        volumeSize: 200
+        volumeType: io1
+        volumeIOPS: 6400
+    disableIMDSv1: true
+    labels:
+      app: caspark
+      eks.amazonaws.com/capacityType: ON_DEMAND
+    tags:
+      # required for cluster-autoscaler auto-discovery
+      k8s.io/cluster-autoscaler/enabled: "true"
+      k8s.io/cluster-autoscaler/{EKSCLUSTER_NAME}: "owned"
+  - name: od-32vcpu-64gb
+    minSize: 0
+    desiredCapacity: 1
+    maxSize: 50
+    instancesDistribution:
+      instanceTypes: ["c5a.8xlarge","c5ad.8xlarge","c6a.8xlarge","c5.9xlarge"]
+      onDemandBaseCapacity: 0
+      onDemandPercentageAboveBaseCapacity: 100
+    iam:
+      withAddonPolicies:
+        cloudWatch: true
+    availabilityZones: ["{AWS_REGION}b"] 
+    preBootstrapCommands:
+      - "IDX=1;for DEV in /dev/nvme[1-9]n1;do sudo mkfs.xfs ${DEV}; sudo mkdir -p /local${IDX}; sudo echo ${DEV} /local${IDX} xfs defaults,noatime 1 2 >> /etc/fstab; IDX=$((${IDX} + 1)); done"
+      - "sudo mount -a"
+      - "sudo chown ec2-user:ec2-user /local*"
+    volumeSize: 20
+    volumeType: gp3
+    additionalVolumes:
+      - volumeName: '/dev/xvdf'
+        volumeSize: 200
+        volumeType: io1
+        volumeIOPS: 6400
+    disableIMDSv1: true
+    labels:
+      app: caspark
+      eks.amazonaws.com/capacityType: ON_DEMAND
+    tags:
+      # required for cluster-autoscaler auto-discovery
+      k8s.io/cluster-autoscaler/enabled: "true"
+      k8s.io/cluster-autoscaler/{EKSCLUSTER_NAME}: "owned"
+  - name: spot-8vcpu-16gb
+    minSize: 0
+    desiredCapacity: 1
+    maxSize: 50
+    instancesDistribution:
+      instanceTypes: ["c5.2xlarge","c5a.2xlarge","c5ad.2xlarge","c5d.2xlarge","c6a.2xlarge"]
+      onDemandBaseCapacity: 0
+      onDemandPercentageAboveBaseCapacity: 0
+      spotAllocationStrategy: capacity-optimized
+    iam:
+      withAddonPolicies:
+        cloudWatch: true
+    availabilityZones: ["{AWS_REGION}b"] 
+    preBootstrapCommands:
+      - "IDX=1;for DEV in /dev/nvme[1-9]n1;do sudo mkfs.xfs ${DEV}; sudo mkdir -p /local${IDX}; sudo echo ${DEV} /local${IDX} xfs defaults,noatime 1 2 >> /etc/fstab; IDX=$((${IDX} + 1)); done"
+      - "sudo mount -a"
+      - "sudo chown ec2-user:ec2-user /local*"
+    volumeSize: 20
+    volumeType: gp3
+    additionalVolumes:
+      - volumeName: '/dev/xvdf'
+        volumeSize: 200
+        volumeType: io1
+        volumeIOPS: 6400
+    disableIMDSv1: true
+    labels:
+      app: caspark
+      eks.amazonaws.com/capacityType: SPOT
+    tags:
+      # required for cluster-autoscaler auto-discovery
+      k8s.io/cluster-autoscaler/enabled: "true"
+      k8s.io/cluster-autoscaler/{EKSCLUSTER_NAME}: "owned"
+  - name: spot-16vcpu-32gb
+    minSize: 0
+    desiredCapacity: 1
+    maxSize: 50
+    instancesDistribution:
+      instanceTypes: ["c5.4xlarge","c5a.4xlarge","c5ad.4xlarge","c5d.4xlarge","c6a.4xlarge"]
+      onDemandBaseCapacity: 0
+      onDemandPercentageAboveBaseCapacity: 0
+      spotAllocationStrategy: capacity-optimized
+    iam:
+      withAddonPolicies:
+        cloudWatch: true
+    availabilityZones: ["{AWS_REGION}b"] 
+    preBootstrapCommands:
+      - "IDX=1;for DEV in /dev/nvme[1-9]n1;do sudo mkfs.xfs ${DEV}; sudo mkdir -p /local${IDX}; sudo echo ${DEV} /local${IDX} xfs defaults,noatime 1 2 >> /etc/fstab; IDX=$((${IDX} + 1)); done"
+      - "sudo mount -a"
+      - "sudo chown ec2-user:ec2-user /local*"
+    volumeSize: 20
+    volumeType: gp3
+    additionalVolumes:
+      - volumeName: '/dev/xvdf'
+        volumeSize: 200
+        volumeType: io1
+        volumeIOPS: 6400
+    disableIMDSv1: true
+    labels:
+      app: caspark
+      eks.amazonaws.com/capacityType: SPOT
+    tags:
+      # required for cluster-autoscaler auto-discovery
+      k8s.io/cluster-autoscaler/enabled: "true"
+      k8s.io/cluster-autoscaler/{EKSCLUSTER_NAME}: "owned"
+  - name: spot-32vcpu-64gb
+    minSize: 0
+    desiredCapacity: 1
+    maxSize: 50
+    instancesDistribution:
+      instanceTypes: ["c5a.8xlarge","c5ad.8xlarge","c6a.8xlarge","c5.9xlarge"]
+      onDemandBaseCapacity: 0
+      onDemandPercentageAboveBaseCapacity: 0
+      spotAllocationStrategy: capacity-optimized
+    iam:
+      withAddonPolicies:
+        cloudWatch: true
+    availabilityZones: ["{AWS_REGION}b"] 
+    preBootstrapCommands:
+      - "IDX=1;for DEV in /dev/nvme[1-9]n1;do sudo mkfs.xfs ${DEV}; sudo mkdir -p /local${IDX}; sudo echo ${DEV} /local${IDX} xfs defaults,noatime 1 2 >> /etc/fstab; IDX=$((${IDX} + 1)); done"
+      - "sudo mount -a"
+      - "sudo chown ec2-user:ec2-user /local*"
+    volumeSize: 20
+    volumeType: gp3
+    additionalVolumes:
+      - volumeName: '/dev/xvdf'
+        volumeSize: 200
+        volumeType: io1
+        volumeIOPS: 6400
+    disableIMDSv1: true
+    labels:
+      app: caspark
+      eks.amazonaws.com/capacityType: SPOT
+    tags:
+      # required for cluster-autoscaler auto-discovery
+      k8s.io/cluster-autoscaler/enabled: "true"
+      k8s.io/cluster-autoscaler/{EKSCLUSTER_NAME}: "owned"
+      
+cloudWatch: 
+ clusterLogging:
+   enableTypes: ["*"]
+   
+
+# eksctl create iamidentitymapping --cluster eks-demo --arn arn:aws:iam::${AWS_REGION}:role/Admin --group system:masters --username ${EKSCLUSTER_NAME}-admin

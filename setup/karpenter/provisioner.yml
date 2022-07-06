@@ -1,0 +1,33 @@
+apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: default
+spec:
+  provider:
+    launchTemplate: {EKSCLUSTER_NAME}-karpenter-launchtemplate
+    subnetSelector:
+      karpenter.sh/discovery: {EKSCLUSTER_NAME}
+  labels:
+    app: kspark
+  requirements:
+    - key: "karpenter.sh/capacity-type"
+      operator: In
+      values: ["on-demand","spot"]
+    - key: "kubernetes.io/arch" 
+      operator: In
+      values: ["amd64"]
+    - key: karpenter.k8s.aws/instance-family
+      operator: In
+      values: [c5, c5a, c5d, c5ad, m5, c6a]
+    - key: karpenter.k8s.aws/instance-size
+      operator: In
+      values: [2xlarge, 4xlarge, 8xlarge, 9xlarge]
+    - key: "topology.kubernetes.io/zone"
+      operator: In
+      values: ["{AWS_REGION}a"]
+
+  limits:
+    resources:
+      cpu: "2000"
+
+  ttlSecondsAfterEmpty: 30

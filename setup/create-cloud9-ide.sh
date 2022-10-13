@@ -39,6 +39,12 @@ echo "==============================================="
 #Create Cloud9 Environment
 C9_ENV_ID=`aws cloud9 create-environment-ec2 --name ${EKSCLUSTER_NAME}-ide --instance-type t3.medium --query "environmentId" --output text`
 
+until [ $(aws cloud9 describe-environment-status --environment-id ${C9_ENV_ID} --query "status" --output text) = "ready" ];
+do
+echo "Waiting until the Cloud9 IDE is ready"
+sleep 2
+done
+
 #Associate IAM role to Cloud9
 aws ec2 associate-iam-instance-profile \
     --iam-instance-profile Name=${C9_ROLE_NAME}-instance-profile \

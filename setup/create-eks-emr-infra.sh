@@ -10,13 +10,13 @@ export EMRCLUSTER_NAME="${EMRCLUSTER_NAME:-${EKSCLUSTER_NAME}-emr}"
 export ACCOUNTID="${ACCOUNTID:-$(aws sts get-caller-identity --query Account --output text)}"
 export AWS_REGION="${AWS_REGION:-$(curl -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region')}"
 export S3BUCKET="${S3BUCKET:-${EMRCLUSTER_NAME}-${ACCOUNTID}-${AWS_REGION}}"
-export EKS_VERSION="${EKS_VERSION:-1.22}"
+export EKS_VERSION="${EKS_VERSION:-1.23}"
 # get the link to the same version as EKS from here https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html
-export KUBECTL_URL="${KUBECTL_URL:-https://s3.us-west-2.amazonaws.com/amazon-eks/1.22.6/2022-03-09/bin/linux/amd64/kubectl}"
-export HELM_VERSION="${HELM_VERSION:-v3.9.0}"
-export KARPENTER_VERSION="${KARPENTER_VERSION:-v0.11.1}"
+export KUBECTL_URL="${KUBECTL_URL:-https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.7/2022-06-29/bin/darwin/amd64/kubectl}"
+export HELM_VERSION="${HELM_VERSION:-v3.9.4}"
+export KARPENTER_VERSION="${KARPENTER_VERSION:-v0.18.1}"
 # get the most recent matching version of the Cluster Autoscaler from here https://github.com/kubernetes/autoscaler/releases
-export CAS_VERSION="${CAS_VERSION:-v1.22.3}"
+export CAS_VERSION="${CAS_VERSION:-v1.23.1}"
 
 cd ~/environment/karpenter-for-emr-on-eks
 # create S3 bucket for application
@@ -109,11 +109,19 @@ eksctl create iamserviceaccount \
 
 # aws iam create-service-linked-role --aws-service-name spot.amazonaws.com || true
 export KARPENTER_IAM_ROLE_ARN="arn:aws:iam::${ACCOUNTID}:role/${EKSCLUSTER_NAME}-karpenter"
-helm repo add karpenter https://charts.karpenter.sh
-helm repo update
-helm upgrade --install karpenter karpenter/karpenter --namespace karpenter --version ${KARPENTER_VERSION} \
-    --set serviceAccount.create=false --set serviceAccount.name=karpenter --set nodeSelector.app=ops \
-    --set clusterName=${EKSCLUSTER_NAME} --set clusterEndpoint=${API_SERVER} --wait # for the defaulting webhook to install before creating a Provisioner
+# Install Karpenter helm chart
+helm upgrade --install karpenter oci://public.ecr.aws/karpenter/karpenter --version ${KARPENTER_VERSION} --namespace karpenter --create-namespace \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=${KARPENTER_IAM_ROLE_ARN} \
+  --set clusterName=${EKSCLUSTER_NAME} \
+  --set clusterEndpoint=${API_SERVER} \
+  --set aws.defaultInstanceProfile=KarpenterNodeInstanceProfile-${EKSCLUSTER_NAME} \
+  --wait # for the defaulting webhook to install before creating a Provisioner
+
+# helm repo add karpenter https://charts.karpenter.sh
+# helm repo update
+# helm upgrade --install karpenter karpenter/karpenter --namespace karpenter --version ${KARPENTER_VERSION} \
+#     --set serviceAccount.create=false --set serviceAccount.name=karpenter --set nodeSelector.app=ops \
+#     --set clusterName=${EKSCLUSTER_NAME} --set clusterEndpoint=${API_SERVER} --wait # for the defaulting webhook to install before creating a Provisioner
 
 #turn on debug mode
 kubectl patch configmap config-logging -n karpenter --patch '{"data":{"loglevel.controller":"debug"}}'

@@ -17,6 +17,14 @@ vpc:
   
 availabilityZones: ["{AWS_REGION}a","{AWS_REGION}b","{AWS_REGION}c"]
 
+addons:
+  - name: vpc-cni
+    version: latest
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+    
 # IRSA setup
 iam:
   withOIDC: true
@@ -42,8 +50,8 @@ managedNodeGroups:
     instanceTypes: ["c5.xlarge"]
     availabilityZones: ["{AWS_REGION}c"] 
     volumeSize: 100
-    desiredCapacity: 1
-    maxSize: 2
+    desiredCapacity: 2
+    maxSize: 3
     labels:
       app: ops
  

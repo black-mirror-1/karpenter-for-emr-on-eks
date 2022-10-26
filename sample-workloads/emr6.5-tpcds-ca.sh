@@ -9,6 +9,10 @@ export MEMORY="${MEMORY:-8}"
 export MEMORY_OVERHEAD=$(((${MEMORY}*30+(100-1))/100))
 export EXEC_MEMORY=$((${MEMORY}-${MEMORY_OVERHEAD}))
 
+export EKSCLUSTER_NAME="${EKSCLUSTER_NAME:-aws-blog}"
+export EMRCLUSTER_NAME="${EMRCLUSTER_NAME:-${EKSCLUSTER_NAME}-emr}"
+
+export ACCOUNTID="${ACCOUNTID:-$(aws sts get-caller-identity --query Account --output text)}"
 
 export VIRTUAL_CLUSTER_ID=$(aws emr-containers list-virtual-clusters --query "virtualClusters[?name == '${EMRCLUSTER_NAME}-ca' && state == 'RUNNING'].id" --output text)
 export EMR_ROLE_ARN=arn:aws:iam::$ACCOUNTID:role/$EMRCLUSTER_NAME-execution-role

@@ -13,6 +13,8 @@ export EKSCLUSTER_NAME="${EKSCLUSTER_NAME:-aws-blog}"
 export EMRCLUSTER_NAME="${EMRCLUSTER_NAME:-${EKSCLUSTER_NAME}-emr}"
 
 export ACCOUNTID="${ACCOUNTID:-$(aws sts get-caller-identity --query Account --output text)}"
+export AWS_REGION="${AWS_REGION:-$(curl -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region')}"
+export S3BUCKET="${S3BUCKET:-${EMRCLUSTER_NAME}-${ACCOUNTID}-${AWS_REGION}}"
 
 export VIRTUAL_CLUSTER_ID=$(aws emr-containers list-virtual-clusters --query "virtualClusters[?name == '${EMRCLUSTER_NAME}-ca' && state == 'RUNNING'].id" --output text)
 export EMR_ROLE_ARN=arn:aws:iam::$ACCOUNTID:role/$EMRCLUSTER_NAME-execution-role

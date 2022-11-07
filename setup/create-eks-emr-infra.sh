@@ -105,6 +105,7 @@ eksctl create iamserviceaccount \
     --cluster "${EKSCLUSTER_NAME}" --name karpenter --namespace karpenter \
     --role-name "${EKSCLUSTER_NAME}-karpenter" \
     --attach-policy-arn "arn:aws:iam::${ACCOUNTID}:policy/KarpenterControllerPolicy-${EKSCLUSTER_NAME}" \
+    --role-only \
     --approve
 
 # aws iam create-service-linked-role --aws-service-name spot.amazonaws.com || true
@@ -116,12 +117,6 @@ helm upgrade --install karpenter oci://public.ecr.aws/karpenter/karpenter --vers
   --set clusterEndpoint=${API_SERVER} \
   --set aws.defaultInstanceProfile=KarpenterNodeInstanceProfile-${EKSCLUSTER_NAME} \
   --wait # for the defaulting webhook to install before creating a Provisioner
-
-# helm repo add karpenter https://charts.karpenter.sh
-# helm repo update
-# helm upgrade --install karpenter karpenter/karpenter --namespace karpenter --version ${KARPENTER_VERSION} \
-#     --set serviceAccount.create=false --set serviceAccount.name=karpenter --set nodeSelector.app=ops \
-#     --set clusterName=${EKSCLUSTER_NAME} --set clusterEndpoint=${API_SERVER} --wait # for the defaulting webhook to install before creating a Provisioner
 
 #turn on debug mode
 kubectl patch configmap config-logging -n karpenter --patch '{"data":{"loglevel.controller":"debug"}}'
@@ -212,3 +207,20 @@ aws emr-containers create-virtual-cluster --name $EMRCLUSTER_NAME-karpenter \
         "type": "EKS",
         "info": { "eksInfo": { "namespace":"'emr-karpenter'" } }
     }'
+
+echo "========================================================"
+echo "  Build a custom docker image for sample workload ......"
+echo "========================================================"
+
+export ECR_URL="$ACCOUNTID.dkr.ecr.$AWS_REGION.amazonaws.com"
+# remove existing images to save disk space
+docker rmi $(docker images -a | awk {'print $3'}) -f
+# create ECR repo
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_URL
+aws ecr create-repository --repository-name eks-spark-benchmark --image-scanning-configuration scanOnPush=true
+# get image
+docker pull public.ecr.aws/myang-poc/benchmark:6.5
+# tag image
+docker tag public.ecr.aws/myang-poc/benchmark:6.5 $ECR_URL/eks-spark-benchmark:emr6.5 
+# push
+docker push $ECR_URL/eks-spark-benchmark:emr6.5
